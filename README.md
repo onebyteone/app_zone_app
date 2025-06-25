@@ -133,6 +133,395 @@ app_s10/
 - Explora las secciones gaming
 - Cierra sesión cuando quieras
 
+## 🎮 **PROYECTO AVANZADO: Sistema de Registro de Juegos**
+
+### 📋 **Objetivo del Proyecto**
+Ahora que tienes la **autenticación Firebase** funcionando, vamos a crear un **sistema completo de registro de juegos** usando **Firebase Realtime Database**. Los usuarios podrán:
+
+- ✅ **Registrar nuevos juegos** con información detallada
+- ✅ **Ver lista de juegos registrados** en tiempo real
+- ✅ **Editar y eliminar** sus propios juegos
+- ✅ **Filtrar juegos** por categoría y rating
+- ✅ **Sincronización automática** con Firebase
+
+### 🔥 **PASO 1: Configurar Firebase Realtime Database**
+
+#### **1️⃣ Habilitar Realtime Database**
+1. Ve a [Firebase Console](https://console.firebase.google.com/)
+2. Selecciona tu proyecto **GameVault**
+3. En el menú lateral, haz clic en **"Realtime Database"**
+4. Haz clic en **"Crear base de datos"**
+5. Selecciona **"Comenzar en modo de prueba"** (para desarrollo)
+6. Escoge tu región (recomendado: **us-central1**)
+
+#### **2️⃣ Configurar Reglas de Seguridad**
+```json
+{
+  "rules": {
+    "games": {
+      "$uid": {
+        ".read": "$uid === auth.uid",
+        ".write": "$uid === auth.uid"
+      }
+    }
+  }
+}
+```
+
+#### **3️⃣ Agregar Dependencia**
+En `app/build.gradle.kts`, agrega:
+```kotlin
+dependencies {
+    // ... dependencias existentes
+    implementation("com.google.firebase:firebase-database:20.3.0")
+}
+```
+
+### 🎯 **PASO 2: Crear Modelo de Datos**
+
+#### **1️⃣ Crear clase Game.kt**
+```kotlin
+// app/src/main/java/com/example/app_s10/Game.kt
+data class Game(
+    val id: String = "",
+    val title: String = "",
+    val genre: String = "",
+    val platform: String = "",
+    val rating: Float = 0f,
+    val description: String = "",
+    val releaseYear: Int = 0,
+    val completed: Boolean = false,
+    val userId: String = "",
+    val createdAt: Long = System.currentTimeMillis()
+)
+```
+
+### 🎨 **PASO 3: Crear Interfaz de Registro**
+
+#### **1️⃣ Crear activity_add_game.xml**
+```xml
+<!-- app/src/main/res/layout/activity_add_game.xml -->
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/gaming_gradient_bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="24dp">
+
+        <!-- Título -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🎮 Registrar Nuevo Juego"
+            android:textSize="28sp"
+            android:textColor="@color/gaming_cyan"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:layout_marginBottom="32dp" />
+
+        <!-- Formulario -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="8dp"
+            android:layout_marginBottom="24dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="24dp">
+
+                <!-- Campo Título -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Título del juego"
+                    android:layout_marginBottom="16dp">
+                    
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etGameTitle"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Campo Género -->
+                <com.google.android.material.textfield.TextInputLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="Género"
+                    android:layout_marginBottom="16dp">
+                    
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/etGameGenre"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <!-- Rating -->
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Rating: 0/5"
+                    android:textSize="16sp"
+                    android:layout_marginBottom="8dp" />
+
+                <RatingBar
+                    android:id="@+id/ratingBar"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:numStars="5"
+                    android:rating="0"
+                    android:layout_marginBottom="16dp" />
+
+                <!-- Botón Guardar -->
+                <Button
+                    android:id="@+id/btnSaveGame"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="💾 GUARDAR JUEGO"
+                    android:backgroundTint="@color/gaming_purple"
+                    android:textColor="@android:color/white"
+                    android:textStyle="bold"
+                    android:layout_marginTop="16dp" />
+
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+    </LinearLayout>
+</ScrollView>
+```
+
+### 📱 **PASO 4: Crear Activity para Registro**
+
+#### **1️⃣ Crear AddGameActivity.kt**
+```kotlin
+// app/src/main/java/com/example/app_s10/AddGameActivity.kt
+class AddGameActivity : AppCompatActivity() {
+    
+    private lateinit var database: DatabaseReference
+    private lateinit var auth: FirebaseAuth
+    
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContentView(R.layout.activity_add_game)
+        
+        // Inicializar Firebase
+        auth = FirebaseAuth.getInstance()
+        database = FirebaseDatabase.getInstance().reference
+        
+        setupViews()
+    }
+    
+    private fun setupViews() {
+        val etTitle = findViewById<TextInputEditText>(R.id.etGameTitle)
+        val etGenre = findViewById<TextInputEditText>(R.id.etGameGenre)
+        val ratingBar = findViewById<RatingBar>(R.id.ratingBar)
+        val btnSave = findViewById<Button>(R.id.btnSaveGame)
+        
+        btnSave.setOnClickListener {
+            val title = etTitle.text.toString().trim()
+            val genre = etGenre.text.toString().trim()
+            val rating = ratingBar.rating
+            
+            if (validateInput(title, genre)) {
+                saveGame(title, genre, rating)
+            }
+        }
+    }
+    
+    private fun validateInput(title: String, genre: String): Boolean {
+        if (title.isEmpty()) {
+            showError("El título es obligatorio")
+            return false
+        }
+        if (genre.isEmpty()) {
+            showError("El género es obligatorio")
+            return false
+        }
+        return true
+    }
+    
+    private fun saveGame(title: String, genre: String, rating: Float) {
+        val userId = auth.currentUser?.uid ?: return
+        val gameId = database.child("games").child(userId).push().key ?: return
+        
+        val game = Game(
+            id = gameId,
+            title = title,
+            genre = genre,
+            rating = rating,
+            userId = userId
+        )
+        
+        database.child("games").child(userId).child(gameId).setValue(game)
+            .addOnSuccessListener {
+                showSuccess("¡Juego guardado exitosamente!")
+                finish()
+            }
+            .addOnFailureListener { exception ->
+                showError("Error al guardar: ${exception.message}")
+            }
+    }
+    
+    private fun showError(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+    
+    private fun showSuccess(message: String) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+    }
+}
+```
+
+### 📋 **PASO 5: Crear Lista de Juegos**
+
+#### **1️⃣ Crear item_game.xml**
+```xml
+<!-- app/src/main/res/layout/item_game.xml -->
+<com.google.android.material.card.MaterialCardView 
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="4dp"
+    android:layout_margin="8dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:padding="16dp">
+
+        <TextView
+            android:id="@+id/tvGameTitle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Título del Juego"
+            android:textSize="18sp"
+            android:textStyle="bold"
+            android:textColor="@color/gaming_purple" />
+
+        <TextView
+            android:id="@+id/tvGameGenre"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Género"
+            android:textSize="14sp"
+            android:layout_marginTop="4dp" />
+
+        <RatingBar
+            android:id="@+id/ratingBarItem"
+            style="?android:attr/ratingBarStyleSmall"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
+
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>
+```
+
+#### **2️⃣ Crear GameAdapter.kt**
+```kotlin
+// app/src/main/java/com/example/app_s10/GameAdapter.kt
+class GameAdapter(private var games: List<Game>) : 
+    RecyclerView.Adapter<GameAdapter.GameViewHolder>() {
+    
+    class GameViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+        val tvTitle: TextView = itemView.findViewById(R.id.tvGameTitle)
+        val tvGenre: TextView = itemView.findViewById(R.id.tvGameGenre)
+        val ratingBar: RatingBar = itemView.findViewById(R.id.ratingBarItem)
+    }
+    
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): GameViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_game, parent, false)
+        return GameViewHolder(view)
+    }
+    
+    override fun onBindViewHolder(holder: GameViewHolder, position: Int) {
+        val game = games[position]
+        holder.tvTitle.text = game.title
+        holder.tvGenre.text = game.genre
+        holder.ratingBar.rating = game.rating
+    }
+    
+    override fun getItemCount() = games.size
+    
+    fun updateGames(newGames: List<Game>) {
+        games = newGames
+        notifyDataSetChanged()
+    }
+}
+```
+
+### 🔄 **PASO 6: Integrar con MainActivity**
+
+#### **1️⃣ Actualizar MainActivity.kt**
+```kotlin
+// Agregar en MainActivity.kt
+private fun setupGameFeatures() {
+    // Botón para agregar juego
+    val btnAddGame = findViewById<Button>(R.id.btnAddGame)
+    btnAddGame.setOnClickListener {
+        startActivity(Intent(this, AddGameActivity::class.java))
+    }
+    
+    // Botón para ver juegos
+    val btnViewGames = findViewById<Button>(R.id.btnViewGames)
+    btnViewGames.setOnClickListener {
+        startActivity(Intent(this, GamesListActivity::class.java))
+    }
+}
+```
+
+### 🎯 **PASO 7: Tareas para los Estudiantes**
+
+#### **📝 Ejercicios Obligatorios:**
+
+1. **🔥 Configuración Firebase Database**
+   - Habilitar Realtime Database en Firebase Console
+   - Configurar reglas de seguridad
+   - Agregar dependencia en build.gradle
+
+2. **💾 Implementar Registro de Juegos**
+   - Crear modelo Game.kt
+   - Implementar AddGameActivity.kt
+   - Crear formulario con validaciones
+
+3. **📋 Lista de Juegos**
+   - Crear RecyclerView con GameAdapter
+   - Implementar lectura en tiempo real
+   - Mostrar datos del usuario autenticado
+
+4. **✨ Funcionalidades Extra (Opcional)**
+   - Editar juegos existentes
+   - Eliminar juegos
+   - Filtros por género
+   - Búsqueda por título
+
+#### **🎮 Resultado Esperado:**
+- Los usuarios pueden registrar sus juegos favoritos
+- Los datos se guardan automáticamente en Firebase
+- La lista se actualiza en tiempo real
+- Solo ven sus propios juegos (privacidad)
+
+### 📚 **Recursos de Apoyo**
+
+- **[Firebase Realtime Database Docs](https://firebase.google.com/docs/database/android/start)**
+- **[RecyclerView Tutorial](https://developer.android.com/develop/ui/views/layout/recyclerview)**
+- **[Material Design Components](https://material.io/develop/android)**
+
+---
+
 ## 🛠️ Personalización
 
 ### **Cambiar Colores**
