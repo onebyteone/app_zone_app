@@ -34,6 +34,31 @@
             </intent-filter>
         </activity>
         
+        <!-- Nuevas actividades del proyecto avanzado -->
+        <activity
+            android:name=".AddGameActivity"
+            android:exported="false"
+            android:theme="@style/Theme.App_s10"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".GamesListActivity"
+            android:exported="false"
+            android:theme="@style/Theme.App_s10"
+            android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".EditGameActivity"
+            android:exported="false"
+            android:theme="@style/Theme.App_s10"
+            android:parentActivityName=".GamesListActivity" />
+
+        <activity
+            android:name=".StatisticsActivity"
+            android:exported="false"
+            android:theme="@style/Theme.App_s10"
+            android:parentActivityName=".MainActivity" />
+
     </application>
 
 </manifest>

@@ -49,8 +49,20 @@
     <string name="player_stats">Estadísticas del Jugador</string>
     <string name="achievements">Logros</string>
     <string name="settings">Configuración</string>
-    <string name="profile">Perfil</string>
-    
+
+    <!-- Pantalla Agregar Juego -->
+    <string name="add_game_title">Agregar Juego</string>
+    <string name="game_title_hint">Título del juego</string>
+    <string name="game_genre_hint">Género</string>
+    <string name="game_platform_hint">Plataforma</string>
+    <string name="game_release_year_hint">Año de lanzamiento</string>
+    <string name="game_rating_label">Calificación</string>
+    <string name="game_description_hint">Descripción</string>
+    <string name="game_completed_label">Juego completado</string>
+    <string name="btn_cancel">Cancelar</string>
+    <string name="btn_save">Guardar</string>
+    <string name="back_button_description">Volver atrás</string>
+
     <!-- Mensajes generales -->
     <string name="ok">OK</string>
     <string name="cancel">Cancelar</string>

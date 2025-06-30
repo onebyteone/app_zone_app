@@ -12,22 +12,30 @@ import androidx.cardview.widget.CardView
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.button.MaterialButton
+import com.google.android.material.floatingactionbutton.FloatingActionButton
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
+import com.google.firebase.database.*
 
 class MainActivity : AppCompatActivity() {
     
     private lateinit var auth: FirebaseAuth
-    
+    private lateinit var database: DatabaseReference
+
     // Views
     private lateinit var tvWelcome: TextView
     private lateinit var tvUserEmail: TextView
     private lateinit var btnLogout: MaterialButton
+    private lateinit var cardGames: CardView
     private lateinit var cardStats: CardView
     private lateinit var cardAchievements: CardView
     private lateinit var cardProfile: CardView
-    private lateinit var cardSettings: CardView
-    
+    private lateinit var fabAddGame: FloatingActionButton
+
+    // Statistics
+    private lateinit var tvTotalGamesCount: TextView
+    private lateinit var tvCompletedGamesCount: TextView
+
     companion object {
         private const val TAG = "MainActivity"
     }
@@ -37,13 +45,13 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         setContentView(R.layout.activity_main)
         
-        // Inicializar Firebase Auth
+        // Inicializar Firebase
         auth = FirebaseAuth.getInstance()
-        
+        database = FirebaseDatabase.getInstance().reference
+
         // Verificar autenticación
         val currentUser = auth.currentUser
         if (currentUser == null) {
-            // Usuario no autenticado, redirigir al login
             redirectToLogin()
             return
         }
@@ -58,6 +66,9 @@ class MainActivity : AppCompatActivity() {
         // Configurar listeners
         setupClickListeners()
         
+        // Cargar estadísticas rápidas
+        loadQuickStats()
+
         Log.d(TAG, "MainActivity iniciado para usuario: ${currentUser.email}")
     }
     
@@ -66,10 +77,13 @@ class MainActivity : AppCompatActivity() {
         tvWelcome = findViewById(R.id.tv_welcome)
         tvUserEmail = findViewById(R.id.tv_user_email)
         btnLogout = findViewById(R.id.btn_logout)
+        cardGames = findViewById(R.id.card_games)
         cardStats = findViewById(R.id.card_stats)
         cardAchievements = findViewById(R.id.card_achievements)
         cardProfile = findViewById(R.id.card_profile)
-        cardSettings = findViewById(R.id.card_settings)
+        fabAddGame = findViewById(R.id.fab_add_game)
+        tvTotalGamesCount = findViewById(R.id.tv_total_games_count)
+        tvCompletedGamesCount = findViewById(R.id.tv_completed_games_count)
     }
     
     private fun setupWindowInsets() {
@@ -99,100 +113,119 @@ class MainActivity : AppCompatActivity() {
         
         // Verificar estado de verificación de email
         if (!user.isAnonymous && user.email != null && !user.isEmailVerified) {
-            showEmailVerificationDialog()
+            showEmailVerificationReminder()
         }
     }
     
     private fun setupClickListeners() {
-        // Botón logout
         btnLogout.setOnClickListener {
-            showLogoutConfirmationDialog()
+            showLogoutConfirmation()
+        }
+
+        cardGames.setOnClickListener {
+            val intent = Intent(this, GamesListActivity::class.java)
+            startActivity(intent)
         }
         
-        // Cards de navegación (placeholder por ahora)
         cardStats.setOnClickListener {
-            showFeatureComingSoon("Estadísticas del Jugador")
+            val intent = Intent(this, StatisticsActivity::class.java)
+            startActivity(intent)
         }
         
         cardAchievements.setOnClickListener {
-            showFeatureComingSoon("Logros")
+            Toast.makeText(this, "Logros - Próximamente disponible", Toast.LENGTH_SHORT).show()
         }
         
         cardProfile.setOnClickListener {
-            showFeatureComingSoon("Perfil")
+            Toast.makeText(this, "Perfil - Próximamente disponible", Toast.LENGTH_SHORT).show()
         }
         
-        cardSettings.setOnClickListener {
-            showFeatureComingSoon("Configuración")
+        fabAddGame.setOnClickListener {
+            val intent = Intent(this, AddGameActivity::class.java)
+            startActivity(intent)
         }
     }
-    
-    private fun showLogoutConfirmationDialog() {
-        AlertDialog.Builder(this)
-            .setTitle("Cerrar Sesión")
-            .setMessage("¿Estás seguro de que quieres cerrar sesión?")
-            .setPositiveButton("Sí") { _, _ ->
-                performLogout()
-            }
-            .setNegativeButton("Cancelar", null)
-            .setIcon(android.R.drawable.ic_dialog_alert)
-            .show()
+
+    private fun loadQuickStats() {
+        val currentUser = auth.currentUser ?: return
+
+        database.child("games")
+            .orderByChild("userId")
+            .equalTo(currentUser.uid)
+            .addValueEventListener(object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    var totalGames = 0
+                    var completedGames = 0
+
+                    for (gameSnapshot in snapshot.children) {
+                        val game = gameSnapshot.getValue(Game::class.java)
+                        if (game != null) {
+                            totalGames++
+                            if (game.completed) {
+                                completedGames++
+                            }
+                        }
+                    }
+
+                    tvTotalGamesCount.text = totalGames.toString()
+                    tvCompletedGamesCount.text = completedGames.toString()
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    Log.e(TAG, "Error loading quick stats: ${error.message}")
+                }
+            })
     }
-    
-    private fun performLogout() {
-        auth.signOut()
-        Toast.makeText(this, getString(R.string.logout_success), Toast.LENGTH_SHORT).show()
-        Log.d(TAG, "Usuario desconectado")
-        redirectToLogin()
-    }
-    
-    private fun redirectToLogin() {
-        val intent = Intent(this, LoginActivity::class.java)
-        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
-        startActivity(intent)
-        finish()
-    }
-    
-    private fun showEmailVerificationDialog() {
+
+    private fun showEmailVerificationReminder() {
         AlertDialog.Builder(this)
             .setTitle("Verificar Email")
-            .setMessage(getString(R.string.auth_email_verification_required))
+            .setMessage("Por favor verifica tu email para acceder a todas las funcionalidades.")
             .setPositiveButton("Enviar verificación") { _, _ ->
                 sendEmailVerification()
             }
-            .setNegativeButton("Más tarde", null)
-            .setIcon(android.R.drawable.ic_dialog_info)
+            .setNegativeButton("Después", null)
             .show()
     }
     
     private fun sendEmailVerification() {
-        val user = auth.currentUser
-        user?.sendEmailVerification()
+        auth.currentUser?.sendEmailVerification()
             ?.addOnCompleteListener { task ->
                 if (task.isSuccessful) {
-                    Toast.makeText(this, getString(R.string.auth_verification_email_sent), Toast.LENGTH_LONG).show()
+                    Toast.makeText(this, "Email de verificación enviado", Toast.LENGTH_SHORT).show()
                 } else {
                     Toast.makeText(this, "Error al enviar verificación", Toast.LENGTH_SHORT).show()
                 }
             }
     }
     
-    private fun showFeatureComingSoon(featureName: String) {
+    private fun showLogoutConfirmation() {
         AlertDialog.Builder(this)
-            .setTitle("Próximamente")
-            .setMessage("La función '$featureName' será implementada en futuras versiones.")
-            .setPositiveButton("OK", null)
-            .setIcon(android.R.drawable.ic_dialog_info)
+            .setTitle("Cerrar Sesión")
+            .setMessage("¿Estás seguro de que quieres cerrar sesión?")
+            .setPositiveButton("Cerrar Sesión") { _, _ ->
+                performLogout()
+            }
+            .setNegativeButton("Cancelar", null)
             .show()
     }
     
-    override fun onStart() {
-        super.onStart()
-        // Verificar autenticación cada vez que la actividad se vuelve visible
-        val currentUser = auth.currentUser
-        if (currentUser == null) {
-            Log.d(TAG, "Usuario no autenticado en onStart, redirigiendo...")
-            redirectToLogin()
-        }
+    private fun performLogout() {
+        auth.signOut()
+        Toast.makeText(this, "Sesión cerrada", Toast.LENGTH_SHORT).show()
+        redirectToLogin()
+    }
+
+    private fun redirectToLogin() {
+        val intent = Intent(this, LoginActivity::class.java)
+        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK
+        startActivity(intent)
+        finish()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // Recargar estadísticas al volver a la actividad
+        loadQuickStats()
     }
 }
